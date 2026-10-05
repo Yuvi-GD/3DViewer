@@ -5,6 +5,7 @@
 #define TINYOBJLOADER_IMPLEMENTATION
 #include "third_party/tiny_obj_loader/tiny_obj_loader.h"
 #include <vector>
+#include <cfloat>
 
 model model_default() {
 	model m;
@@ -44,6 +45,11 @@ mesh_data load_obj_mesh(const std::string& filepath) {
 	std::vector<vertext> vertices;
 	std::vector<uint16_t> indices;
 
+	mesh_data mesh = {};
+	// Initialize min to max float, and max to min float
+	mesh.min_x = mesh.min_y = mesh.min_z = FLT_MAX;
+	mesh.max_x = mesh.max_y = mesh.max_z = -FLT_MAX;
+
 	for (size_t s = 0; s < shapes.size(); s++) {
 		for (size_t i = 0; i < shapes[s].mesh.indices.size(); i++)
 		{
@@ -53,6 +59,15 @@ mesh_data load_obj_mesh(const std::string& filepath) {
 			v.x = attrib.vertices[3 * size_t(index.vertex_index) + 0];
 			v.y = attrib.vertices[3 * size_t(index.vertex_index) + 1];
 			v.z = attrib.vertices[3 * size_t(index.vertex_index) + 2];
+
+			// Update bounding box
+			if (v.x < mesh.min_x) mesh.min_x = v.x;
+			if (v.y < mesh.min_y) mesh.min_y = v.y;
+			if (v.z < mesh.min_z) mesh.min_z = v.z;
+
+			if (v.x > mesh.max_x) mesh.max_x = v.x;
+			if (v.y > mesh.max_y) mesh.max_y = v.y;
+			if (v.z > mesh.max_z) mesh.max_z = v.z;
 
 			if (index.normal_index >= 0)
 			{
@@ -70,7 +85,6 @@ mesh_data load_obj_mesh(const std::string& filepath) {
 		}
 	}
 
-	mesh_data mesh = {};
 	mesh.index_count = (int)indices.size();
 
 	sg_buffer_desc vbuf_desc = {};

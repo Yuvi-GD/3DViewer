@@ -10,6 +10,10 @@
 typedef struct {
     sg_bindings bind;
     int index_count;
+
+    // Bounding box limits
+    float min_x, min_y, min_z;
+    float max_x, max_y, max_z;
 } mesh_data;
 
 // We will implement this in model.cpp
