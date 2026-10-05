@@ -19,3 +19,4 @@ CMakeUserPresets.json
 #cmake-build-*
 /.vs
 /out/build/x64-debug
+/shaders/triangle_shader.h

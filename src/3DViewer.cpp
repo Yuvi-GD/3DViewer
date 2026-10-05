@@ -1,4 +1,6 @@
 ﻿// 3DViewer.cpp : Defines the entry point for the application.
+#include "3DViewer.h"
+#include "model.h"
 
 #define SOKOL_IMPL
 #if defined(_WIN32)
@@ -10,21 +12,18 @@
 #endif
 #define SOKOL_NO_ENTRY
 
-#include "3DViewer.h"
 #include "third_party/sokol/sokol_app.h"
 #include "third_party/sokol/sokol_gfx.h"
 #include "third_party/sokol/sokol_glue.h"
-#include "triangle_shader.h"
+#include "object_shader.h"
 #include <cglm/cglm.h>
-#include "model.h"
 
-using namespace std;
 
 static struct {
 	sg_pass_action ActionPass;
-	sg_bindings binding;
+	mesh_data loaded_mesh;
 	sg_pipeline pipeline;
-	model triangle;
+	model object;
 } State;
 
 static struct {
@@ -43,25 +42,26 @@ void init() {
 	Desc.environment = sglue_environment();
 	sg_setup(&Desc);
 
-	State.triangle = model_default();
+	State.object = model_default();
 
-	float vertices[] = {
-		0.0f, 0.5f, 0.0f, 1.0f, 0.0f, 0.0f,
-		0.5f, -0.5f, 0.0f, 0.0f, 1.0f, 0.0f,
-		-0.5f, -0.5f, 0.0f, 0.0f, 0.0f, 1.0f,
-	};
+	State.loaded_mesh = load_obj_mesh("model.obj");
 
-	State.binding = {};
-    sg_buffer_desc buffdesc = {};
-	buffdesc.size = sizeof(vertices);
-    buffdesc.data = SG_RANGE(vertices);
-    State.binding.vertex_buffers[0] = sg_make_buffer(&buffdesc);
+	//State.binding = {};
+ //   sg_buffer_desc buffdesc = {};
+	//buffdesc.size = sizeof(vertices);
+ //   buffdesc.data = SG_RANGE(vertices);
+ //   State.binding.vertex_buffers[0] = sg_make_buffer(&buffdesc);
 
 	sg_pipeline_desc pipedesc = {};
-	pipedesc.shader = sg_make_shader(triangle_shader_desc(sg_query_backend()));
-	pipedesc.layout.attrs[ATTR_triangle_pos].format = SG_VERTEXFORMAT_FLOAT3;
-	pipedesc.layout.attrs[ATTR_triangle_color].format = SG_VERTEXFORMAT_FLOAT3;
-
+	pipedesc.shader = sg_make_shader(object_shader_desc(sg_query_backend()));
+	pipedesc.layout.attrs[ATTR_object_pos].format = SG_VERTEXFORMAT_FLOAT3;
+	//pipedesc.layout.attrs[ATTR_object_color].format = SG_VERTEXFORMAT_FLOAT3;
+	pipedesc.layout.attrs[ATTR_object_normal].format = SG_VERTEXFORMAT_FLOAT3;
+	pipedesc.depth.compare = SG_COMPAREFUNC_LESS_EQUAL;
+	pipedesc.depth.write_enabled = true;
+	pipedesc.index_type = SG_INDEXTYPE_UINT16;
+	pipedesc.cull_mode = SG_CULLMODE_BACK;
+	pipedesc.face_winding = SG_FACEWINDING_CCW;
 	State.pipeline = sg_make_pipeline(&pipedesc);
 
 
@@ -81,13 +81,13 @@ void frame() {
 
 	mat4 model, view, projection;
 
-	model_matrix(&State.triangle, model);
+	model_matrix(&State.object, model);
 
 	glm_mat4_identity(view);
 	vec3 eye = { 0.0f, 0.0f, 2.0f };
 	//vec3 eye;
-	eye[0] = Camera.target[0] + Camera.distance * cosf(rad_pitch) * sinf(rad_yaw); // Calculate X position based on yaw and pitch
-	eye[1] = Camera.target[1] - Camera.distance * sinf(rad_pitch); // Invert Y-axis for correct camera orientation
+	eye[0] = Camera.target[0] - Camera.distance * cosf(rad_pitch) * sinf(rad_yaw); // Calculate X position based on yaw and pitch
+	eye[1] = Camera.target[1] + Camera.distance * sinf(rad_pitch); // Invert Y-axis for correct camera orientation
 	eye[2] = Camera.target[2] + Camera.distance * cosf(rad_pitch) * cosf(rad_yaw); // Calculate Z position based on yaw and pitch
 	vec3 up = { 0.0f, 1.0f, 0.0f };
 	glm_lookat(eye, Camera.target, up, view);
@@ -107,14 +107,14 @@ void frame() {
 	sg_begin_pass(&pass);
 
 	sg_apply_pipeline(State.pipeline);
-	sg_apply_bindings(&State.binding);
+	sg_apply_bindings(&State.loaded_mesh.bind);
 
-	triangle_params_t params ={0};
+	vs_params_t params ={0};
 	mat4* mats[] = { &projection, &view, &model };
-	glm_mat4_mulN(mats, 3, params.model);
+	glm_mat4_mulN(mats, 3, params.mvp);
 
-	sg_apply_uniforms(UB_triangle_params, SG_RANGE(params));
-	sg_draw(0, 3, 1);
+	sg_apply_uniforms(UB_vs_params, SG_RANGE(params));
+	sg_draw(0, State.loaded_mesh.index_count, 1);
 
 	sg_end_pass();
 	sg_commit();
